@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食品業AI應用互動指南 | 越南數位化起步</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Earthy Harmony -->
+    <!-- Application Structure Plan: The application is designed as a single-page, thematic dashboard rather than a linear report. The structure includes: 1) A main navigation bar for quick access to key sections (Overview, Value Chain, Challenges, Roadmap, Case Studies). 2) An 'Overview' section with animated key performance indicators to immediately show AI's impact. 3) An interactive 'Value Chain' section using tabs to break down dense information into digestible chunks (Agriculture, Manufacturing, Logistics, Safety, Consumer). 4) A 'Challenges & Solutions' section with a donut chart for a high-level view and an accordion for detailed strategies. 5) A visual 'Implementation Roadmap' using a CSS-based timeline. This user-centric, non-linear structure allows different user personas (e.g., managers, tech leads) to quickly find relevant information, enhancing usability and engagement. -->
+    <!-- Visualization & Content Choices: 
+        - Overview KPIs: Goal=Inform/Impact. Method=Animated counters via Vanilla JS. Justification=Grabs attention and quantifies benefits instantly.
+        - Value Chain: Goal=Organize/Compare. Method=Tabbed interface with Unicode icons and content cards. A Chart.js bar chart visualizes key benefits. Justification=Intuitive navigation for complex, multi-part information.
+        - Challenges: Goal=Organize/Inform. Method=Textual explanation (replaces donut chart) summarizing challenge categories and their distribution. Justification=Provides a direct, easy-to-read overview without requiring chart interpretation.
+        - Roadmap: Goal=Change/Organize. Method=Visual timeline built with HTML/Tailwind Flexbox with added modal pop-up for detailed execution steps. Justification=More engaging and easier to grasp than a text table, now with in-depth, prominently displayed execution steps.
+        - Case Studies: Goal=Inform. Method=Responsive grid of cards. Justification=Clean, scannable presentation of real-world examples.
+        - Gemini API Integration: Added "Smart Insights" to Value Chain, "Solution Generator" to Challenges, and "Feasibility Analysis" to Roadmap, leveraging LLMs for dynamic content expansion and personalized analysis.
+        Library/Method: Chart.js for all charts (Canvas-based), Vanilla JS for all interactions, and HTML/Tailwind for all structural diagrams. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #FDFBF6;
+            color: #3C3633;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .nav-link {
+            transition: color 0.3s, border-bottom-color 0.3s;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #E0A75E;
+            border-bottom-color: #E0A75E;
+        }
+        .tab-button {
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .tab-button.active {
+            background-color: #E0A75E;
+            color: #FFFFFF;
+        }
+        .accordion-header {
+            transition: background-color 0.3s;
+        }
+        .accordion-header.open, .accordion-header:hover {
+             background-color: #F5EFE6;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        .accordion-content.open {
+            max-height: 500px; /* Adjust as needed */
+        }
+        .arrow {
+            transition: transform 0.3s;
+        }
+        .arrow.open {
+            transform: rotate(180deg);
+        }
+        .card-hover {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        /* Add scroll-margin-top to prevent headers from being hidden behind the sticky nav */
+        section {
+            scroll-margin-top: 80px; 
+        }
+        .gemini-output-area {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #F8F5F0;
+            border-left: 4px solid #E0A75E;
+            border-radius: 0.5rem;
+            color: #5C5552;
+            font-size: 0.9rem;
+            white-space: pre-wrap; /* Preserve whitespace and breaks */
+        }
+        .loading-indicator {
+            font-style: italic;
+            color: #E0A75E;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+        }
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #FDFBF6;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #AD8B73;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header & Navigation -->
+    <header id="main-header" class="bg-[#FDFBF6]/80 backdrop-blur-sm sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-[#AD8B73]">AI食品業指南</h1>
+            <div class="hidden md:flex space-x-6">
+                <a href="#overview" class="nav-link font-medium pb-1">總覽</a>
+                <a href="#value-chain" class="nav-link font-medium pb-1">價值鏈應用</a>
+                <a href="#challenges" class="nav-link font-medium pb-1">挑戰與對策</a>
+                <a href="#roadmap" class="nav-link font-medium pb-1">實施藍圖</a>
+                <a href="#cases" class="nav-link font-medium pb-1">成功案例</a>
+            </div>
+            <div class="md:hidden">
+                 <select id="mobile-nav" class="bg-white border border-gray-300 rounded-md py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-[#E0A75E] focus:border-transparent">
+                    <option value="#overview">總覽</option>
+                    <option value="#value-chain">價值鏈應用</option>
+                    <option value="#challenges">挑戰與對策</option>
+                    <option value="#roadmap">實施藍圖</option>
+                    <option value="#cases">成功案例</option>
+                </select>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-6 py-8 md:py-12">
+
+        <!-- Section 1: Overview -->
+        <section id="overview" class="text-center mb-16 md:mb-24">
+            <h2 class="text-3xl md:text-4xl font-bold mb-4 text-[#AD8B73]">迎接AI驅動的食品業革命</h2>
+            <p class="max-w-3xl mx-auto text-lg text-gray-600 mb-10">
+                本指南旨在為處於數位化起步階段的越南食品企業提供AI應用戰略。透過數據驅動的洞察，AI正從根本上重塑食品價值鏈，為效率、品質與永續性帶來前所未有的機遇。
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-md card-hover">
+                    <div class="text-4xl font-bold text-[#7A9D54] mb-2" data-counter-target="20">+20%</div>
+                    <h3 class="font-semibold text-gray-700">生產效率提升</h3>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md card-hover">
+                    <div class="text-4xl font-bold text-[#7A9D54] mb-2" data-counter-target="50">-50%</div>
+                    <h3 class="font-semibold text-gray-700">設備停機時間減少</h3>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md card-hover">
+                    <div class="text-4xl font-bold text-[#7A9D54] mb-2" data-counter-target="40">-40%</div>
+                    <h3 class="font-semibold text-gray-700">包裝錯誤減少</h3>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md card-hover">
+                    <div class="text-4xl font-bold text-[#7A9D54] mb-2" data-counter-target="30">-30%</div>
+                    <h3 class="font-semibold text-gray-700">產品缺陷率降低</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Value Chain Applications -->
+        <section id="value-chain" class="mb-16 md:mb-24">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-[#AD8B73]">探索價值鏈中的AI潛力</h2>
+            <p class="max-w-3xl mx-auto text-center text-lg text-gray-600 mb-12">
+                從農場到餐桌，AI在食品產業的每個環節都扮演著變革性的角色。點擊下方標籤，了解AI如何在特定領域創造價值，從優化資源、確保品質到提升消費者體驗。
+            </p>
+            <div id="tabs-container" class="flex flex-wrap justify-center gap-2 md:gap-4 mb-8">
+                <button data-tab="agriculture" class="tab-button active text-sm md:text-base font-medium py-2 px-4 rounded-full bg-[#F5EFE6]">🌾 農業與採購</button>
+                <button data-tab="manufacturing" class="tab-button text-sm md:text-base font-medium py-2 px-4 rounded-full bg-[#F5EFE6]">🏭 製造與加工</button>
+                <button data-tab="logistics" class="tab-button text-sm md:text-base font-medium py-2 px-4 rounded-full bg-[#F5EFE6]">🚚 供應鏈與物流</button>
+                <button data-tab="safety" class="tab-button text-sm md:text-base font-medium py-2 px-4 rounded-full bg-[#F5EFE6]">🛡️ 安全與品質</button>
+                <button data-tab="consumer" class="tab-button text-sm md:text-base font-medium py-2 px-4 rounded-full bg-[#F5EFE6]">🛒 消費者互動</button>
+            </div>
+            <div id="tab-content" class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+                <!-- Content will be dynamically inserted here by JS -->
+            </div>
+        </section>
+
+        <!-- Section 3: Challenges & Solutions -->
+        <section id="challenges" class="mb-16 md:mb-24">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-[#AD8B73]">應對挑戰，制定對策</h2>
+            <p class="max-w-3xl mx-auto text-center text-lg text-gray-600 mb-12">
+                導入AI並非一蹴可幾。越南企業在數位化初期會面臨技術、資金、人才等多重挑戰。本節將分析這些障礙，並提供基於報告的務實解決方案，幫助您規避風險，穩步前行。
+            </p>
+            <div class="flex flex-col lg:flex-row gap-8 items-start">
+                <div class="w-full lg:w-1/3 bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-bold text-[#AD8B73] mb-4 text-center">AI導入主要挑戰分佈概述</h3>
+                    <p class="text-gray-700 text-lg leading-relaxed text-center">
+                        食品業AI導入的主要挑戰分佈在：<br>
+                        <span class="font-semibold text-[#E0A75E]">技術與基礎設施</span> (共<span id="tech-count" class="font-bold"></span>項)<br>
+                        <span class="font-semibold text-[#AD8B73]">數據管理與安全</span> (共<span id="data-count" class="font-bold"></span>項)<br>
+                        <span class="font-semibold text-[#7A9D54]">勞動力與技能差距</span> (共<span id="labor-count" class="font-bold"></span>項)<br>
+                        <span class="font-semibold text-[#3C3633]">財務與投資</span> (共<span id="finance-count" class="font-bold"></span>項)<br>
+                        <span class="font-semibold text-gray-500">組織與文化</span> (共<span id="culture-count" class="font-bold"></span>項)<br>
+                        其中，<span id="most-frequent-category" class="font-bold text-[#E0A75E]"></span>是當前企業面臨的關鍵挑戰領域。
+                    </p>
+                </div>
+                <div id="accordion-container" class="w-full lg:w-2/3 space-y-3">
+                    <!-- Accordion items will be inserted here by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Implementation Roadmap -->
+        <section id="roadmap" class="mb-16 md:mb-24">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-[#AD8B73]">您的四階段AI實施藍圖</h2>
+            <p class="max-w-3xl mx-auto text-center text-lg text-gray-600 mb-12">
+                成功的AI導入需要一個結構化的計畫。我們將報告中的策略濃縮為一個清晰的四階段藍圖。遵循此路徑，您可以從基礎建設開始，逐步試點、擴展，最終實現全面的AI驅動營運。
+            </p>
+            <div class="relative">
+                <!-- Connecting line -->
+                <div class="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-[#E0A75E]/30" style="transform: translateY(-50%); z-index: -1;"></div>
+                <div id="roadmap-phases" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <!-- Roadmap phases will be dynamically generated by JS -->
+                </div>
+            </div>
+
+            <div class="mt-16 bg-white p-8 rounded-2xl shadow-lg flex flex-col items-center">
+                <h3 class="text-2xl font-bold mb-4 text-[#AD8B73] text-center">✨ AI應用可行性分析 ✨</h3>
+                <p class="text-gray-700 mb-6 text-center max-w-2xl">
+                    輸入一個您希望在越南食品業實施的AI應用想法，AI將為您提供初步的可行性評估、潛在挑戰和實施步驟建議。
+                </p>
+                <textarea id="ai-idea-input" rows="4" 
+                    class="w-full max-w-xl p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#E0A75E] mb-4 text-gray-800" 
+                    placeholder="例如：使用AI預測消費者對新口味零食的需求，或利用AI視覺檢測生產線上的產品缺陷...">
+                </textarea>
+                <button id="analyze-ai-idea-btn" 
+                    class="bg-[#7A9D54] text-white px-6 py-3 rounded-full hover:bg-[#6A8A4B] transition duration-300 shadow-md text-lg">
+                    分析AI應用可行性
+                </button>
+                <div id="ai-idea-output" class="gemini-output-area hidden w-full max-w-xl"></div>
+                <div id="ai-idea-loading" class="loading-indicator hidden">分析中...</div>
+            </div>
+        </section>
+
+        <!-- Section 5: Case Studies -->
+        <section id="cases">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-[#AD8B73]">區域成功案例</h2>
+            <p class="max-w-3xl mx-auto text-center text-lg text-gray-600 mb-12">
+                AI不僅是理論，更是在地實踐。從越南的乳製品巨頭到新加坡的創新科技公司，許多企業已經從AI中獲益。這些案例證明了AI在東南亞市場的可行性與巨大潛力。
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
+                    <h3 class="text-xl font-bold mb-2">Vinamilk 🇻🇳</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">越南乳製品生產商</p>
+                    <p class="text-gray-600">利用AI分析動物健康數據，預測疾病風險，改善治療品質，提升畜牧管理水平。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
+                    <h3 class="text-xl font-bold mb-2">Cricket One 🇻🇳</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">越南蛋白質生產商</p>
+                    <p class="text-gray-600">自2019年起部署AI，用於監測蟋蟀的生活條件，確保替代蛋白質的生產品質與效率。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
+                    <h3 class="text-xl font-bold mb-2">國際稻米研究所 🇻🇳</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">國際研究機構</p>
+                    <p class="text-gray-600">利用AI開發氣候韌性水稻品種，幫助越南農民應對氣候變遷帶來的挑戰。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
+                    <h3 class="text-xl font-bold mb-2">AquaEasy 🇸🇬</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">新加坡AIoT解決方案</p>
+                    <p class="text-gray-600">提供AI物聯網方案，讓蝦子「與農民對話」，提升蝦農的生產力、獲利與永續性。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
+                    <h3 class="text-xl font-bold mb-2">MODGUT 🇹🇭</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">泰國微生物組專家</p>
+                    <p class="text-gray-600">利用微生物組洞察力，引領一場食品革命，實現個性化營養和創新的食品生產。</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-lg card-hover">
+                    <h3 class="text-xl font-bold mb-2">BioDefense 🇸🇬</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">新加坡生物科技</p>
+                    <p class="text-gray-600">利用新型生物技術，幫助肉類、魚類和海鮮保鮮時間延長達三倍，打造更智慧的供應鏈。</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Roadmap Details Modal -->
+    <div id="roadmap-modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content">
+            <button id="modal-close-btn" class="modal-close-btn">✕</button>
+            <h3 id="modal-title" class="text-2xl md:text-3xl font-bold text-[#AD8B73] mb-4"></h3>
+            <div id="modal-details" class="text-gray-700 text-lg space-y-4">
+                <!-- Details will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-[#F5EFE6] mt-16 md:mt-24">
+        <div class="container mx-auto px-6 py-6 text-center text-gray-600">
+            <p>&copy; 2025 AI食品業應用互動指南。基於戰略報告分析建立。</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Function to call Gemini API
+            async function callGeminiAPI(prompt) {
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        console.error('Gemini API returned an unexpected structure or no content:', result);
+                        return '未能獲取智慧洞察。請稍後再試。';
+                    }
+                } catch (error) {
+                    console.error('Error calling Gemini API:', error);
+                    return '呼叫智慧洞察時發生錯誤。請檢查您的網路連接。';
+                }
+            }
+
+
+            // Data for the application
+            const valueChainData = {
+                agriculture: {
+                    title: '🌾 智慧農業與採購',
+                    description: 'AI正從根本上改變傳統農產品的生產與供應，使其更具效率、精準度和環境友善性。',
+                    points: [
+                        { name: '精準農業', detail: '透過無人機與衛星圖像優化資源使用，降低成本。' },
+                        { name: '病蟲害檢測', detail: '電腦視覺技術早期發現病蟲害，保護作物產量。' },
+                        { name: '連接農民與買家', detail: 'AI平台直接匹配供需，消除中間商，確保公平定價。' },
+                        { name: '畜牧管理', detail: '分析動物健康數據，預測疾病風險，提升生產力。' }
+                    ],
+                    benefits: [
+                        {label: "產量提升", value: 15},
+                        {label: "成本降低", value: 20},
+                        {label: "浪費減少", value: 25},
+                    ]
+                },
+                manufacturing: {
+                    title: '🏭 優化食品製造與加工',
+                    description: 'AI引領製造業邁向更高的效率、更嚴格的品質控制和更智慧的生產模式。',
+                    points: [
+                        { name: '生產效率與自動化', detail: '將生產效率提升高達20%，減少人為錯誤。' },
+                        { name: '即時監控', detail: '即時發現產品缺陷或污染，確保品質一致性。' },
+                        { name: '預測性維護', detail: '預測設備故障，將停機時間減少30-50%。' },
+                        { name: '包裝優化', detail: 'AI驅動機器人簡化流程，將錯誤減少高達40%。' }
+                    ],
+                    benefits: [
+                        {label: "效率提升", value: 20},
+                        {label: "停機減少", value: 50},
+                        {label: "錯誤減少", value: 40},
+                    ]
+                },
+                logistics: {
+                    title: '🚚 優化供應鏈管理與物流',
+                    description: 'AI為食品供應鏈帶來前所未有的精準度、效率和韌性，有效應對市場波動。',
+                    points: [
+                        { name: '需求預測', detail: '精準預測需求，減少庫存過剩與浪費。' },
+                        { name: '路線優化', detail: '計算最有效運輸路線，降低成本與環境影響。' },
+                        { name: '即時追蹤', detail: '確保食品準時送達，減少變質和短缺。' },
+                        { name: '供應鏈韌性', detail: '預測潛在供應鏈中斷，自動化應對策略。' }
+                    ],
+                    benefits: [
+                        {label: "物流成本降低", value: 15},
+                        {label: "庫存水平改善", value: 35},
+                        {label: "服務水平提升", value: 65},
+                    ]
+                },
+                safety: {
+                    title: '🛡️ 先進食品安全與品質控制',
+                    description: 'AI將食品安全從被動應對轉向主動預防，透過預測性分析保障消費者健康。',
+                    points: [
+                        { name: '即時檢測', detail: '高精度檢測物理污染物、品質缺陷與不當標籤。' },
+                        { name: '預測性風險評估', detail: '預測污染事件最可能發生的時間和地點，實現主動預防。' },
+                        { name: '可追溯性', detail: '結合區塊鏈技術，實現從農場到餐桌的全面追蹤與快速召回。' },
+                        { name: '法規遵循', detail: '自動化法規遵循工作流程，降低不合規風險。' }
+                    ],
+                    benefits: [
+                        {label: "缺陷減少", value: 30},
+                        {label: "檢測時間縮短", value: 90},
+                        {label: "召回效率提升", value: 95},
+                    ]
+                },
+                consumer: {
+                    title: '🛒 個性化消費者互動與產品開發',
+                    description: 'AI重新定義品牌與消費者的關係，透過深度洞察加速創新並提升客戶忠誠度。',
+                    points: [
+                        { name: '個性化推薦', detail: '提供量身定制的產品建議與超精準促銷。' },
+                        { name: '動態定價', detail: '即時調整價格，最大化盈利能力。' },
+                        { name: '智慧客服', detail: '聊天機器人處理常見問題，提供個性化菜單建議。' },
+                        { name: '產品開發', detail: '分析市場趨勢與消費者偏好，加速新產品開發。' }
+                    ],
+                    benefits: [
+                        {label: "品牌忠誠度提升", value: 25},
+                        {label: "開發速度加快", value: 40},
+                        {label: "客戶滿意度提升", value: 30},
+                    ]
+                }
+            };
+
+            const challengesData = [
+                { category: '技術與基礎設施', challenge: '高昂的初始投資與舊系統整合困難。', solution: '採用分階段實施策略，從高回報的試點項目開始。選擇模組化、可擴展的AI解決方案，並尋求政府政策支持。' },
+                { category: '數據管理與安全', challenge: '缺乏高質量的數據，以及數據隱私顧慮。', solution: '建立數據治理和品質管理系統。部署強大的安全協議，並對員工進行數據安全培訓，建立信任。' },
+                { category: '勞動力與技能差距', challenge: '缺乏操作AI系統的熟練專業人員。', solution: '投資員工培訓與技能提升計畫。與教育機構合作，培養新一代AI人才，並明確AI是增強而非取代角色。' },
+                { category: '財務與投資', challenge: '前期成本高，投資回報（ROI）不明確。', solution: '從小規模、具明確商業價值的項目開始，證明ROI。尋求政府資助或針對中小企業的財務支持計畫。' },
+                { category: '組織與文化', challenge: '員工抗拒變革，擔心工作被取代。', solution: '強化變革管理，由領導層推動，透明溝通AI的效益。讓員工參與到轉型過程中，培養創新文化。' }
+            ];
+
+            const roadmapData = [
+                {
+                    phase: '階段 1',
+                    title: '準備與基礎建設',
+                    shortDesc: '評估現狀、建立數據治理、獲得領導層支持，為AI奠定堅實基礎。',
+                    details: [
+                        '**AI準備度評估:** 聘請外部顧問或組建內部跨職能團隊，評估現有技術堆疊、數據儲存格式、網絡基礎設施、員工數位素養和財務資源。識別數據孤島並評估數據品質。',
+                        '**數據治理建立:** 制定數據收集、儲存、清理、標準化和共享的政策與流程。投資數據倉庫或數據湖解決方案。確保數據安全與隱私合規。',
+                        '**領導層共識與願景設定:** 舉辦高層研討會，明確AI轉型的商業價值和目標。指定專責的AI轉型領導者或委員會。',
+                        '**內部溝通與變革管理:** 向員工透明溝通AI導入的目標與效益，強調AI是增強而非取代。'
+                    ]
+                },
+                {
+                    phase: '階段 2',
+                    title: '試點與分階段實施',
+                    shortDesc: '選擇高影響力試點項目，快速驗證價值，建立內部信心與ROI證明。',
+                    details: [
+                        '**用例選擇:** 根據評估結果，選擇1-2個影響力大、數據可獲取、預期ROI高的試點用例（例如：特定產品的缺陷視覺檢測、單一物流線路的需求預測）。',
+                        '**供應商/解決方案選型:** 研究市場上與試點用例相關的AI解決方案，評估技術匹配度、供應商經驗和成本效益。優先考慮可擴展、模組化的方案。',
+                        '**小規模部署與測試:** 在受控環境下（例如單條生產線、特定倉庫區域）部署試點方案。嚴格監控數據、性能和整合效果。',
+                        '**績效評估與回報分析:** 定期收集關鍵績效指標（KPIs），量化AI帶來的效益（如缺陷率降低、庫存準確性提升、能源消耗減少）。計算初步ROI。',
+                        '**員工培訓與反饋:** 對參與試點的員工進行密集培訓。收集他們的反饋，用於調整方案和優化操作流程。'
+                    ]
+                },
+                {
+                    phase: '階段 3',
+                    title: '擴展與整合',
+                    shortDesc: '複製成功經驗，將AI與核心系統整合，實現規模化效益與端到端優化。',
+                    details: [
+                        '**成功經驗複製:** 將試點成功的AI解決方案逐步推廣到其他生產線、工廠或業務區域。確保標準化實施和知識傳遞。',
+                        '**企業系統整合:** 將AI解決方案與現有的ERP（企業資源規劃）、MES（製造執行系統）、SCADA（監控與數據採集）系統進行深度整合，實現數據流暢。',
+                        '**擴大數據源與模型優化:** 將AI模型連接到更多內部和外部數據源，持續訓練和優化模型性能，提高預測和分析的準確性。',
+                        '**建立內部AI專業團隊:** 逐步建立內部數據科學家、AI工程師和維護專家團隊，減少對外部供應商的依賴。'
+                    ]
+                },
+                {
+                    phase: '階段 4',
+                    title: '持續改進與對齊',
+                    shortDesc: '利用AI獲得深度洞察，建立創新文化，確保技術與業務戰略持續對齊。',
+                    details: [
+                        '**建立智慧工廠/供應鏈生態:** 實現AI、IoT、自動化設備的全面互聯互通，形成端到端智慧化營運。',
+                        '**進階AI應用探索:** 探索和實施更複雜的AI應用，如生成式AI用於產品創新、情境感知型機器人、預測性市場分析。',
+                        '**數據驅動決策文化:** 建立跨職能數據共享和洞察會議機制，鼓勵所有層級員工利用AI洞察進行決策。',
+                        '**持續創新與市場適應:** 定期評估AI戰略與市場變化、新技術發展和業務目標的對齊情況。建立創新實驗室或合作夥伴關係，保持競爭力。'
+                    ]
+                }
+            ];
+
+            // Smooth Scrolling & Active Nav Link
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('section');
+            const header = document.getElementById('main-header');
+            
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - header.clientHeight - 20) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').substring(1) === current) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    document.querySelector(this.getAttribute('href')).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+            
+            // Mobile navigation
+            const mobileNav = document.getElementById('mobile-nav');
+            mobileNav.addEventListener('change', (e) => {
+                 document.querySelector(e.target.value).scrollIntoView({ behavior: 'smooth' });
+            });
+
+
+            // Counter Animation
+            const counters = document.querySelectorAll('[data-counter-target]');
+            const animateCounter = (el) => {
+                const target = +el.getAttribute('data-counter-target');
+                let count = 0;
+                const sign = Math.sign(target);
+                const absTarget = Math.abs(target);
+                
+                const updateCount = () => {
+                    const increment = absTarget / 100;
+                    count += increment;
+
+                    if (count < absTarget) {
+                        const prefix = sign > 0 ? '+' : '-';
+                        el.innerText = prefix + Math.ceil(count) + '%';
+                        requestAnimationFrame(updateCount);
+                    } else {
+                        const prefix = sign > 0 ? '+' : '-';
+                        el.innerText = prefix + absTarget + '%';
+                    }
+                };
+                updateCount();
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        animateCounter(entry.target);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.5 });
+            
+            counters.forEach(counter => observer.observe(counter));
+
+            // Value Chain Tabs
+            const tabsContainer = document.getElementById('tabs-container');
+            const tabContentContainer = document.getElementById('tab-content');
+            let benefitsChart = null;
+
+            function renderTabContent(tabKey) {
+                const data = valueChainData[tabKey];
+                if (!data) return;
+
+                const pointsHTML = data.points.map(point => `
+                    <div class="flex items-start">
+                        <span class="text-green-500 mr-3 mt-1">✓</span>
+                        <div>
+                            <h4 class="font-semibold">${point.name}</h4>
+                            <p class="text-gray-600 text-sm">${point.detail}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+                tabContentContainer.innerHTML = `
+                    <div class="flex flex-col lg:flex-row gap-8">
+                        <div class="w-full lg:w-1/2">
+                            <h3 class="text-2xl font-bold mb-4">${data.title}</h3>
+                            <p class="text-gray-700 mb-6">${data.description}</p>
+                            <div class="space-y-4">${pointsHTML}</div>
+                            <button id="generate-insight-btn" data-title="${data.title}" 
+                                class="mt-6 bg-[#AD8B73] text-white px-5 py-2 rounded-full hover:bg-[#E0A75E] transition duration-300 shadow-md">
+                                ✨ 智慧洞察 ✨
+                            </button>
+                            <div id="insight-output" class="gemini-output-area hidden"></div>
+                            <div id="insight-loading" class="loading-indicator hidden">生成中...</div>
+                        </div>
+                        <div class="w-full lg:w-1/2">
+                           <div class="chart-container h-[250px] sm:h-[300px] md:h-[350px]">
+                                <canvas id="benefitsChart"></canvas>
+                           </div>
+                        </div>
+                    </div>
+                `;
+                renderBenefitsChart(data.benefits);
+
+                // Add event listener for the new button
+                const generateInsightBtn = document.getElementById('generate-insight-btn');
+                const insightOutputDiv = document.getElementById('insight-output');
+                const insightLoadingDiv = document.getElementById('insight-loading');
+
+                generateInsightBtn.addEventListener('click', async () => {
+                    insightOutputDiv.classList.add('hidden');
+                    insightOutputDiv.textContent = '';
+                    insightLoadingDiv.classList.remove('hidden');
+
+                    const prompt = `請為食品業的『${generateInsightBtn.dataset.title.replace(/[\u0000-\u001F\u007F-\u009F\u2000-\u200F\u2028-\u202F\u205F\u3000\uFEFF]/g, '').trim()}』這個AI應用領域，提供2-3個補充的具體應用範例和簡要說明。請直接列出應用範例和說明，不需前言或結語。`;
+                    const result = await callGeminiAPI(prompt);
+                    
+                    insightLoadingDiv.classList.add('hidden');
+                    insightOutputDiv.textContent = result;
+                    insightOutputDiv.classList.remove('hidden');
+                });
+            }
+            
+            function renderBenefitsChart(benefitsData) {
+                const ctx = document.getElementById('benefitsChart').getContext('2d');
+                if (benefitsChart) {
+                    benefitsChart.destroy();
+                }
+                benefitsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: benefitsData.map(b => {
+                            // Wrap labels if too long
+                            const maxLength = 16;
+                            if (b.label.length > maxLength) {
+                                return b.label.split(' ').map((word, i, arr) => {
+                                    return word.length > maxLength / 2 && arr.length > 1 ? `${word}\n` : word;
+                                }).join('');
+                            }
+                            return b.label;
+                        }),
+                        datasets: [{
+                            label: '效益提升/降低 (%)',
+                            data: benefitsData.map(b => b.value),
+                            backgroundColor: '#7A9D54',
+                            borderColor: '#6A8A4B',
+                            borderWidth: 1,
+                            borderRadius: 5,
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.raw}%`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: '效益提升/降低 (%)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            tabsContainer.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    const tabKey = e.target.dataset.tab;
+                    tabsContainer.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    renderTabContent(tabKey);
+                }
+            });
+
+            // Initial render
+            renderTabContent('agriculture');
+
+
+            // Challenges Textual Explanation
+            const challengeCounts = challengesData.reduce((acc, curr) => {
+                acc[curr.category] = (acc[curr.category] || 0) + 1;
+                return acc;
+            }, {});
+
+            let maxCount = 0;
+            let mostFrequentCategory = '';
+            for (const category in challengeCounts) {
+                if (challengeCounts[category] > maxCount) {
+                    maxCount = challengeCounts[category];
+                    mostFrequentCategory = category;
+                }
+            }
+
+            document.getElementById('tech-count').textContent = challengeCounts['技術與基礎設施'] || 0;
+            document.getElementById('data-count').textContent = challengeCounts['數據管理與安全'] || 0;
+            document.getElementById('labor-count').textContent = challengeCounts['勞動力與技能差距'] || 0;
+            document.getElementById('finance-count').textContent = challengeCounts['財務與投資'] || 0;
+            document.getElementById('culture-count').textContent = challengeCounts['組織與文化'] || 0;
+            document.getElementById('most-frequent-category').textContent = mostFrequentCategory;
+            
+            // Accordion
+            const accordionContainer = document.getElementById('accordion-container');
+            challengesData.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'bg-white rounded-lg shadow-sm border border-gray-200';
+                div.innerHTML = `
+                    <div id="accordion-header-${index}" class="accordion-header flex justify-between items-center p-4 cursor-pointer">
+                        <h4 class="font-semibold">${item.category}: ${item.challenge}</h4>
+                        <span class="arrow text-2xl font-light text-[#E0A75E]">↓</span>
+                    </div>
+                    <div id="accordion-content-${index}" class="accordion-content px-4">
+                        <p class="py-4 border-t border-gray-200 text-gray-600">${item.solution}</p>
+                        <button id="generate-solution-btn-${index}" data-challenge="${item.challenge}" 
+                            class="mt-4 bg-[#AD8B73] text-white px-4 py-2 rounded-full text-sm hover:bg-[#E0A75E] transition duration-300 shadow-md">
+                            ✨ 解決方案生成器 ✨
+                        </button>
+                        <div id="solution-output-${index}" class="gemini-output-area hidden"></div>
+                        <div id="solution-loading-${index}" class="loading-indicator hidden">生成中...</div>
+                    </div>
+                `;
+                accordionContainer.appendChild(div);
+
+                const header = document.getElementById(`accordion-header-${index}`);
+                const content = document.getElementById(`accordion-content-${index}`);
+                const arrow = header.querySelector('.arrow');
+                const generateSolutionBtn = document.getElementById(`generate-solution-btn-${index}`);
+                const solutionOutputDiv = document.getElementById(`solution-output-${index}`);
+                const solutionLoadingDiv = document.getElementById(`solution-loading-${index}`);
+
+
+                header.addEventListener('click', () => {
+                    const isOpen = content.classList.contains('open');
+                    // Close all others
+                    // document.querySelectorAll('.accordion-content.open').forEach(el => el.classList.remove('open'));
+                    // document.querySelectorAll('.accordion-header.open').forEach(el => el.classList.remove('open'));
+                    // document.querySelectorAll('.arrow.open').forEach(el => el.classList.remove('open'));
+                    
+                    if (!isOpen) {
+                        content.classList.add('open');
+                        header.classList.add('open');
+                        arrow.classList.add('open');
+                    } else {
+                        content.classList.remove('open');
+                        header.classList.remove('open');
+                        arrow.classList.remove('open');
+                    }
+                });
+
+                generateSolutionBtn.addEventListener('click', async () => {
+                    solutionOutputDiv.classList.add('hidden');
+                    solutionOutputDiv.textContent = '';
+                    solutionLoadingDiv.classList.remove('hidden');
+
+                    const prompt = `請為食品業數位化過程中『${generateSolutionBtn.dataset.challenge}』這個挑戰，提供2-3個在越南實際可行的補充解決方案。請直接列出解決方案，不需前言或結語。`;
+                    const result = await callGeminiAPI(prompt);
+                    
+                    solutionLoadingDiv.classList.add('hidden');
+                    solutionOutputDiv.textContent = result;
+                    solutionOutputDiv.classList.remove('hidden');
+                });
+            });
+
+            // Roadmap Phases generation and interaction
+            const roadmapPhasesContainer = document.getElementById('roadmap-phases');
+            const roadmapModalOverlay = document.getElementById('roadmap-modal-overlay');
+            const modalTitle = document.getElementById('modal-title');
+            const modalDetails = document.getElementById('modal-details');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+
+            roadmapData.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-6 rounded-xl shadow-lg text-center card-hover';
+                div.innerHTML = `
+                    <div class="text-4xl mb-4">${['🔬', '🚀', '📈', '🔄'][index]}</div>
+                    <h3 class="text-xl font-bold mb-2">${item.phase}</h3>
+                    <p class="font-semibold text-[#AD8B73] mb-3">${item.title}</p>
+                    <p class="text-gray-600 text-sm">${item.shortDesc}</p>
+                    <button data-phase-index="${index}" 
+                        class="show-roadmap-details-btn mt-4 bg-[#AD8B73] text-white px-4 py-2 rounded-full text-sm hover:bg-[#E0A75E] transition duration-300 shadow-md flex items-center justify-center mx-auto">
+                        顯示執行詳細資訊 <span class="arrow text-xl font-light ml-2">↓</span>
+                    </button>
+                `;
+                roadmapPhasesContainer.appendChild(div);
+            });
+
+            document.querySelectorAll('.show-roadmap-details-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.phaseIndex);
+                    const phaseData = roadmapData[index];
+
+                    modalTitle.textContent = `${phaseData.phase}: ${phaseData.title}`;
+                    modalDetails.innerHTML = phaseData.details.map(detail => `<p>${detail}</p>`).join('');
+                    roadmapModalOverlay.classList.remove('hidden');
+                });
+            });
+
+            modalCloseBtn.addEventListener('click', () => {
+                roadmapModalOverlay.classList.add('hidden');
+            });
+            roadmapModalOverlay.addEventListener('click', (e) => {
+                if (e.target === roadmapModalOverlay) {
+                    roadmapModalOverlay.classList.add('hidden');
+                }
+            });
+
+
+            // AI Idea Feasibility Analysis
+            const aiIdeaInput = document.getElementById('ai-idea-input');
+            const analyzeAiIdeaBtn = document.getElementById('analyze-ai-idea-btn');
+            const aiIdeaOutput = document.getElementById('ai-idea-output');
+            const aiIdeaLoading = document.getElementById('ai-idea-loading');
+
+            analyzeAiIdeaBtn.addEventListener('click', async () => {
+                const idea = aiIdeaInput.value.trim();
+                if (!idea) {
+                    aiIdeaOutput.textContent = '請輸入您的AI應用想法。';
+                    aiIdeaOutput.classList.remove('hidden');
+                    return;
+                }
+
+                aiIdeaOutput.classList.add('hidden');
+                aiIdeaOutput.textContent = '';
+                aiIdeaLoading.classList.remove('hidden');
+
+                const prompt = `Considering a food industry company in Vietnam that is in the early stages of digital transformation, please provide a brief feasibility analysis (3-4 sentences), potential challenges specific to Vietnam (2-3 points), and initial steps (2-3 points) for implementing the following AI application idea: '${idea}'. Respond in Traditional Chinese.`;
+                const result = await callGeminiAPI(prompt);
+
+                aiIdeaLoading.classList.add('hidden');
+                aiIdeaOutput.textContent = result;
+                aiIdeaOutput.classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
